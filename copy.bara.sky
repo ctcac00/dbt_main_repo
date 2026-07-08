@@ -9,7 +9,7 @@ core.workflow(
         push = "main",
     ),
     authoring = authoring.pass_thru("dbt_main_repo <noreply@github.com>"),
-    origin_files = glob(["**"]),
+    origin_files = glob(["**"], exclude = [".github/workflows/copybara.yml"]),
     destination_files = glob(["**"]),
     mode = "ITERATIVE",
 )

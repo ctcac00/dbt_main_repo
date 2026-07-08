@@ -3,17 +3,64 @@ name: Copybara sync
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      init_history:
+        description: "Run with --init-history (use once, for the initial sync only)"
+        type: boolean
+        required: false
+        default: false
+
+env:
+  COPYBARA_VERSION: v20260706
 
 jobs:
   copybara:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: will-molloy/copybara-action@v1
+      - uses: actions/setup-java@v4
         with:
-          git_name: ${{ github.actor }}
-          git_email: ${{ github.actor }}@users.noreply.github.com
-          ssh_key: ${{ secrets.COPYBARA_SSH_KEY }}
-          ssh_known_hosts: ${{ secrets.COPYBARA_KNOWN_HOSTS }}
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Copybara jar
+        id: cache-copybara
+        uses: actions/cache@v4
+        with:
+          path: copybara_deploy.jar
+          key: copybara-jar-${{ env.COPYBARA_VERSION }}
+
+      - name: Download Copybara
+        if: steps.cache-copybara.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL -o copybara_deploy.jar "https://github.com/google/copybara/releases/download/${COPYBARA_VERSION}/copybara_deploy.jar"
+          curl -sSL -o copybara_deploy.jar.sha256 "https://github.com/google/copybara/releases/download/${COPYBARA_VERSION}/copybara_deploy.jar.sha256"
+          echo "$(cat copybara_deploy.jar.sha256)  copybara_deploy.jar" | sha256sum -c -
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.COPYBARA_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.COPYBARA_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Configure git
+        run: |
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - name: Run Copybara
+        run: |
+          FLAGS=()
+          if [ "${{ inputs.init_history }}" = "true" ]; then
+            FLAGS+=(--init-history --force)
+          fi
+          java -jar copybara_deploy.jar migrate copy.bara.sky "${FLAGS[@]}" || {
+            code=$?
+            # Exit code 4 = NO_OP: Copybara found no new changes to sync, not an error.
+            [ "$code" -eq 4 ] && exit 0
+            exit "$code"
+          }
