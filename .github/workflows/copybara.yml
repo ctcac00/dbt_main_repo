@@ -11,32 +11,51 @@ on:
         required: false
         default: false
 
+env:
+  COPYBARA_VERSION: v20260706
+
 jobs:
   copybara:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - uses: will-molloy/copybara-action@v1
-        if: ${{ !inputs.init_history }}
+      - uses: actions/setup-java@v4
         with:
-          git_name: ${{ github.actor }}
-          git_email: ${{ github.actor }}@users.noreply.github.com
-          ssh_key: ${{ secrets.COPYBARA_SSH_KEY }}
-          ssh_known_hosts: ${{ secrets.COPYBARA_KNOWN_HOSTS }}
+          distribution: temurin
+          java-version: "21"
 
-      - name: Copybara --help (debug)
-        if: ${{ inputs.init_history }}
-        run: docker run --rm sharelatex/copybara copybara --help
+      - name: Cache Copybara jar
+        id: cache-copybara
+        uses: actions/cache@v4
+        with:
+          path: copybara_deploy.jar
+          key: copybara-jar-${{ env.COPYBARA_VERSION }}
 
-      - name: Copybara (initial sync)
-        if: ${{ inputs.init_history }}
+      - name: Download Copybara
+        if: steps.cache-copybara.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL -o copybara_deploy.jar "https://github.com/google/copybara/releases/download/${COPYBARA_VERSION}/copybara_deploy.jar"
+          curl -sSL -o copybara_deploy.jar.sha256 "https://github.com/google/copybara/releases/download/${COPYBARA_VERSION}/copybara_deploy.jar.sha256"
+          echo "$(cat copybara_deploy.jar.sha256)  copybara_deploy.jar" | sha256sum -c -
+
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.COPYBARA_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           echo "${{ secrets.COPYBARA_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Configure git
+        run: |
           git config --global user.name "${{ github.actor }}"
           git config --global user.email "${{ github.actor }}@users.noreply.github.com"
-          docker pull sharelatex/copybara:latest
-          docker run -v ~/.ssh:/root/.ssh -v ~/.gitconfig:/root/.gitconfig -v "$(pwd)":/usr/src/app -i sharelatex/copybara copybara . --init-history
+
+      - name: Run Copybara
+        run: |
+          FLAGS=()
+          if [ "${{ inputs.init_history }}" = "true" ]; then
+            FLAGS+=(--init-history)
+          fi
+          java -jar copybara_deploy.jar migrate copy.bara.sky "${FLAGS[@]}"
