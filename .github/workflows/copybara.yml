@@ -58,4 +58,9 @@ jobs:
           if [ "${{ inputs.init_history }}" = "true" ]; then
             FLAGS+=(--init-history --force)
           fi
-          java -jar copybara_deploy.jar migrate copy.bara.sky "${FLAGS[@]}"
+          java -jar copybara_deploy.jar migrate copy.bara.sky "${FLAGS[@]}" || {
+            code=$?
+            # Exit code 4 = NO_OP: Copybara found no new changes to sync, not an error.
+            [ "$code" -eq 4 ] && exit 0
+            exit "$code"
+          }
