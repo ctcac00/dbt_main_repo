@@ -1,0 +1,12 @@
+models:
+  - name: locations
+    description: Location dimension mart, offering key details for each open store location. One row per location.
+    columns:
+      - name: location_id
+        description: The unique key for each location.
+      - name: location_name
+        description: The display name of the store location.
+      - name: opened_date
+        description: The date when the store location opened.
+      - name: tax_rate
+        description: The sales tax rate applied at the store location.
