@@ -56,6 +56,6 @@ jobs:
         run: |
           FLAGS=()
           if [ "${{ inputs.init_history }}" = "true" ]; then
-            FLAGS+=(--init-history)
+            FLAGS+=(--init-history --force)
           fi
           java -jar copybara_deploy.jar migrate copy.bara.sky "${FLAGS[@]}"
