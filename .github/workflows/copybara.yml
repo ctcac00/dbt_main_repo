@@ -1,0 +1,19 @@
+name: Copybara sync
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  copybara:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: will-molloy/copybara-action@v1
+        with:
+          git_name: ${{ github.actor }}
+          git_email: ${{ github.actor }}@users.noreply.github.com
+          ssh_key: ${{ secrets.COPYBARA_SSH_KEY }}
+          ssh_known_hosts: ${{ secrets.COPYBARA_KNOWN_HOSTS }}
