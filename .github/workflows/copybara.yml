@@ -25,6 +25,10 @@ jobs:
           ssh_key: ${{ secrets.COPYBARA_SSH_KEY }}
           ssh_known_hosts: ${{ secrets.COPYBARA_KNOWN_HOSTS }}
 
+      - name: Copybara --help (debug)
+        if: ${{ inputs.init_history }}
+        run: docker run --rm sharelatex/copybara copybara --help
+
       - name: Copybara (initial sync)
         if: ${{ inputs.init_history }}
         run: |
