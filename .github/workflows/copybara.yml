@@ -3,17 +3,36 @@ name: Copybara sync
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      init_history:
+        description: "Run with --init-history (use once, for the initial sync only)"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   copybara:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: will-molloy/copybara-action@v1
+        if: ${{ !inputs.init_history }}
         with:
           git_name: ${{ github.actor }}
           git_email: ${{ github.actor }}@users.noreply.github.com
           ssh_key: ${{ secrets.COPYBARA_SSH_KEY }}
           ssh_known_hosts: ${{ secrets.COPYBARA_KNOWN_HOSTS }}
+
+      - name: Copybara (initial sync)
+        if: ${{ inputs.init_history }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.COPYBARA_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.COPYBARA_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          git config --global user.name "${{ github.actor }}"
+          git config --global user.email "${{ github.actor }}@users.noreply.github.com"
+          docker pull sharelatex/copybara:latest
+          docker run -v ~/.ssh:/root/.ssh -v ~/.gitconfig:/root/.gitconfig -v "$(pwd)":/usr/src/app -i sharelatex/copybara copybara . --init-history
